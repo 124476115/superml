@@ -1,0 +1,11 @@
+{
+  "name": "superml",
+  "version": "1.0.0",
+  "description": "Super Mario 网页游戏（SDD + TDD 开发，零依赖）",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}
