@@ -116,8 +116,11 @@ export class Game {
     const info = moveWithCollision(this.player, dt, this.level);
     this.player.onGround = info.onGround;
 
-    // 3. 水平输入（加速/减速）— 在移动后更新 vx，确保当前帧 vx 先用于位移
-    updatePlayerHorizontal(this.player, input, dt);
+    // 3. 水平输入（加速/减速）— 在移动后更新 vx
+    //    若本帧撞墙（vx 已被碰撞解析归零），跳过加速避免立即重新增速
+    if (!info.hitX) {
+      updatePlayerHorizontal(this.player, input, dt);
+    }
 
     // 4. 顶撞问号块
     for (const b of info.bumpedTiles) {

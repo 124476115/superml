@@ -21,10 +21,11 @@ export function tileAt(level, tx, ty) {
 
 // 判断实体是否与任何实心瓦片重叠
 export function solidTilesOverlap(entity, level) {
+  // 用 -0.0001 避免边界相切时误判（与 aabbOverlap 严格 < 一致）
   const minTx = Math.floor(entity.x / TILE_SIZE);
-  const maxTx = Math.floor((entity.x + entity.w - 1) / TILE_SIZE);
+  const maxTx = Math.floor((entity.x + entity.w - 0.0001) / TILE_SIZE);
   const minTy = Math.floor(entity.y / TILE_SIZE);
-  const maxTy = Math.floor((entity.y + entity.h - 1) / TILE_SIZE);
+  const maxTy = Math.floor((entity.y + entity.h - 0.0001) / TILE_SIZE);
   for (let ty = minTy; ty <= maxTy; ty++) {
     for (let tx = minTx; tx <= maxTx; tx++) {
       const t = tileAt(level, tx, ty);
@@ -47,9 +48,9 @@ function moveX(entity, dx, level, info) {
     if (!solidTilesOverlap(entity, level)) continue;
     // 发生碰撞：对齐到墙边
     const minTx = Math.floor(entity.x / TILE_SIZE);
-    const maxTx = Math.floor((entity.x + entity.w - 1) / TILE_SIZE);
+    const maxTx = Math.floor((entity.x + entity.w - 0.0001) / TILE_SIZE);
     const minTy = Math.floor(entity.y / TILE_SIZE);
-    const maxTy = Math.floor((entity.y + entity.h - 1) / TILE_SIZE);
+    const maxTy = Math.floor((entity.y + entity.h - 0.0001) / TILE_SIZE);
     if (sign > 0) {
       // 向右撞：找最左 solid 瓦片，玩家右边界对齐到其左边界
       let wallTx = Infinity;
@@ -96,9 +97,9 @@ function moveY(entity, dy, level, info) {
     if (!solidTilesOverlap(entity, level)) continue;
     // 发生碰撞：对齐
     const minTx = Math.floor(entity.x / TILE_SIZE);
-    const maxTx = Math.floor((entity.x + entity.w - 1) / TILE_SIZE);
+    const maxTx = Math.floor((entity.x + entity.w - 0.0001) / TILE_SIZE);
     const minTy = Math.floor(entity.y / TILE_SIZE);
-    const maxTy = Math.floor((entity.y + entity.h - 1) / TILE_SIZE);
+    const maxTy = Math.floor((entity.y + entity.h - 0.0001) / TILE_SIZE);
     if (sign > 0) {
       // 向下落：找最上 solid 瓦片，玩家底面对齐到其顶面
       let groundTy = Infinity;
