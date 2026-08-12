@@ -144,6 +144,7 @@ test('AC-4.3 踩敌人得分：+100、敌人死亡、玩家反弹（经 update �
   const level = makeLevel({ enemies: [{ x: 200, y: 8 * TILE_SIZE - 26 }] });
   const game = new Game(level);
   game.start();
+  game.invincibleTimer = 0; // 测试中跳过无敌时间
   const e = game.enemies[0];
   // 玩家贴着敌人顶部下落
   game.player.x = e.x;
@@ -161,6 +162,7 @@ test('AC-4.4 侧面接触敌人：损失一条命并重生（经 update 集成�
   const level = makeLevel({ enemies: [{ x: 200, y: 8 * TILE_SIZE - 26 }] });
   const game = new Game(level);
   game.start();
+  game.invincibleTimer = 0; // 测试中跳过无敌时间
   const e = game.enemies[0];
   game.player.x = e.x - 10;
   game.player.y = 8 * TILE_SIZE - 30; // 与敌人同高度（侧面接触）

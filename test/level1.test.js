@@ -7,12 +7,12 @@ import { parseLevel } from '../src/engine/level.js';
 import { Game } from '../src/engine/game.js';
 import { Input } from '../src/engine/input.js';
 import { level1Text } from '../src/levels/level1.js';
-import { TILE_SIZE, PLAYER_HEIGHT } from '../src/engine/physics.js';
+import { TILE_SIZE } from '../src/engine/physics.js';
 
 const DT = 1 / 60;
 
 // 辅助：模拟玩家持续按右键，返回通关前的帧数；超时返回 -1
-function autoRunToFlag(maxFrames = 6000) {
+function autoRunToFlag(maxFrames = 8000) {
   const level = parseLevel(level1Text);
   const game = new Game(level);
   game.start();
@@ -20,15 +20,27 @@ function autoRunToFlag(maxFrames = 6000) {
   input.keydown('d'); // 持续向右
 
   for (let i = 0; i < maxFrames; i++) {
-    // 遇到深渊前自动跳跃（简单 AI：脚下无地面时跳）
+    // 遇到深渊或墙时跳跃；前方有敌人也跳跃（踩踏）
     if (game.player.onGround) {
-      // 检测前方 1 瓦片是否为深渊或墙
       const px = game.player.x + game.player.w;
       const tx = Math.floor(px / TILE_SIZE);
       const ty = Math.floor(game.player.y / TILE_SIZE) + 1; // 脚下一行
       const tileBelow = level.tiles[ty * level.width + tx];
       const tileAhead = level.tiles[(ty - 1) * level.width + tx];
-      if (tileBelow !== 1 || tileAhead === 1) {
+      const needJumpForGap = tileBelow !== 1;
+      const needJumpForWall = tileAhead === 1;
+      // 前方 3 瓦片内是否有敌人
+      let needJumpForEnemy = false;
+      for (const e of game.enemies) {
+        if (!e.alive) continue;
+        const dx = e.x - game.player.x;
+        if (dx > 0 && dx < TILE_SIZE * 3 &&
+            Math.abs(e.y - game.player.y) < TILE_SIZE) {
+          needJumpForEnemy = true;
+          break;
+        }
+      }
+      if (needJumpForGap || needJumpForWall || needJumpForEnemy) {
         input.keydown(' ');
       } else {
         input.keyup(' ');

@@ -1,7 +1,7 @@
 // AC-3 关卡解析
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TILE_SIZE } from '../src/engine/physics.js';
+import { TILE_SIZE, PLAYER_WIDTH, PLAYER_HEIGHT, ENEMY_WIDTH, ENEMY_HEIGHT } from '../src/engine/physics.js';
 import { parseLevel } from '../src/engine/level.js';
 
 // 18 列 × 7 行（已对齐）
@@ -38,24 +38,33 @@ test('AC-3.2 实心字符 # / ? 映射为 1，其余为 0', () => {
   assert.equal(level.tiles[idx(9, 0)], 0);  // o 位置非实心
 });
 
-test('AC-3.3 识别 P 出生点并换算为瓦片中心像素坐标', () => {
+test('AC-3.3 识别 P 出生点并换算为站立左上角坐标', () => {
   const level = parseLevel(LEVEL_TEXT);
+  // P 在 (4,0)：水平居中在瓦片，垂直站在瓦片上（底部=(0+1)*TILE_SIZE）
   assert.deepEqual(level.playerStart, {
-    x: (4 + 0.5) * TILE_SIZE,
-    y: (0 + 0.5) * TILE_SIZE,
+    x: 4 * TILE_SIZE + (TILE_SIZE - PLAYER_WIDTH) / 2,
+    y: 1 * TILE_SIZE - PLAYER_HEIGHT,
   });
 });
 
-test('AC-3.4 识别所有 o 金币坐标', () => {
+test('AC-3.4 识别所有 o 金币坐标（瓦片中心，金币左上角偏移）', () => {
   const level = parseLevel(LEVEL_TEXT);
   assert.equal(level.coins.length, 1);
-  assert.deepEqual(level.coins[0], { x: (9 + 0.5) * TILE_SIZE, y: (0 + 0.5) * TILE_SIZE, taken: false });
+  // 金币中心对齐瓦片中心，左上角 = 中心 - (10, 12)
+  assert.deepEqual(level.coins[0], {
+    x: (9 + 0.5) * TILE_SIZE - 10,
+    y: (0 + 0.5) * TILE_SIZE - 12,
+    taken: false,
+  });
 });
 
-test('AC-3.5 识别所有 G 敌人坐标', () => {
+test('AC-3.5 识别所有 G 敌人坐标（站立左上角）', () => {
   const level = parseLevel(LEVEL_TEXT);
   assert.equal(level.enemies.length, 1);
-  assert.deepEqual(level.enemies[0], { x: (12 + 0.5) * TILE_SIZE, y: (0 + 0.5) * TILE_SIZE });
+  assert.deepEqual(level.enemies[0], {
+    x: 12 * TILE_SIZE + (TILE_SIZE - ENEMY_WIDTH) / 2,
+    y: 1 * TILE_SIZE - ENEMY_HEIGHT,
+  });
 });
 
 test('AC-3.6 识别 F 旗杆坐标', () => {

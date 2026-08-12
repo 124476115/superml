@@ -33,11 +33,15 @@ export class Game {
     this.state = 'READY';
     this.paused = false;
     this.cameraX = 0;
+    this.invincibleTimer = 0;
   }
 
   // AC-5.1 READY → PLAYING
   start() {
-    if (this.state === 'READY') this.state = 'PLAYING';
+    if (this.state === 'READY') {
+      this.state = 'PLAYING';
+      this.invincibleTimer = 1.5; // 初始 1.5 秒无敌，让玩家反应
+    }
   }
 
   // AC-5.5 重置全部状态
@@ -47,6 +51,7 @@ export class Game {
     this.state = 'READY';
     this.paused = false;
     this.cameraX = 0;
+    this.invincibleTimer = 1.5; // 重启后也给予无敌时间
     this.player.x = this.level.playerStart.x;
     this.player.y = this.level.playerStart.y;
     this.player.vx = 0;
@@ -88,6 +93,8 @@ export class Game {
     this.player.vx = 0;
     this.player.vy = 0;
     this.player.onGround = false;
+    // 1.5 秒无敌时间，防止 respawn 后立即又撞到敌人
+    this.invincibleTimer = 1.5;
   }
 
   // AC-2.6 顶撞问号块：标记已用并在上方生成金币
@@ -108,6 +115,11 @@ export class Game {
   update(dt, input) {
     if (this.state !== 'PLAYING') return;
     if (this.paused) return;
+
+    // 递减无敌时间
+    if (this.invincibleTimer > 0) {
+      this.invincibleTimer = Math.max(0, this.invincibleTimer - dt);
+    }
 
     // 1. 垂直物理（跳跃 + 重力）— 在移动前更新 vy
     updatePlayerVertical(this.player, input, dt);
@@ -146,16 +158,18 @@ export class Game {
       }
     }
 
-    // 8. 敌人碰撞
-    for (const enemy of this.enemies) {
-      const type = enemyCollisionType(this.player, enemy);
-      if (type === 'stomp') {
-        squashEnemy(enemy);
-        bouncePlayer(this.player);
-        this.score += ENEMY_SCORE;
-      } else if (type === 'hurt') {
-        this.onHurt();
-        return;
+    // 8. 敌人碰撞（无敌时间内跳过）
+    if (this.invincibleTimer <= 0) {
+      for (const enemy of this.enemies) {
+        const type = enemyCollisionType(this.player, enemy);
+        if (type === 'stomp') {
+          squashEnemy(enemy);
+          bouncePlayer(this.player);
+          this.score += ENEMY_SCORE;
+        } else if (type === 'hurt') {
+          this.onHurt();
+          return;
+        }
       }
     }
 
