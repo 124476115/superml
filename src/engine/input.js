@@ -2,14 +2,22 @@
 
 export class Input {
   constructor() {
-    this.left = false;
-    this.right = false;
-    this.jumpHeld = false;
+    this._keys = new Set(); // 当前按下的原始键（Set 天然去重，免疫浏览器按键重复）
     this.jumpPressed = false;
     this.pausePressed = false;
-    this._leftCount = 0;
-    this._rightCount = 0;
-    this._jumpCount = 0;
+  }
+
+  get left() {
+    return this._keys.has('ArrowLeft') || this._keys.has('a') || this._keys.has('A');
+  }
+
+  get right() {
+    return this._keys.has('ArrowRight') || this._keys.has('d') || this._keys.has('D');
+  }
+
+  get jumpHeld() {
+    return this._keys.has('ArrowUp') || this._keys.has('w') ||
+      this._keys.has('W') || this._keys.has(' ');
   }
 
   // AC-7.1 键位映射
@@ -37,50 +45,23 @@ export class Input {
     }
   }
 
-  // AC-7.1b/7.2 按下按键（同方向多键计数去重）
+  // AC-7.1b/7.2 按下按键（Set 去重，免疫浏览器按键重复机制）
   keydown(key) {
     const action = Input.actionForKey(key);
     if (action === null) return;
-    switch (action) {
-      case 'left':
-        this._leftCount++;
-        this.left = true;
-        break;
-      case 'right':
-        this._rightCount++;
-        this.right = true;
-        break;
-      case 'jump':
-        this._jumpCount++;
-        this.jumpHeld = true;
-        this.jumpPressed = true;
-        break;
-      case 'pause':
-        this.pausePressed = true;
-        break;
+    const wasPressed = this._keys.has(key);
+    this._keys.add(key);
+    if (action === 'jump' && !wasPressed) {
+      this.jumpPressed = true;
+    }
+    if (action === 'pause' && !wasPressed) {
+      this.pausePressed = true;
     }
   }
 
   // AC-7.1b/7.2 松开按键
   keyup(key) {
-    const action = Input.actionForKey(key);
-    if (action === null) return;
-    switch (action) {
-      case 'left':
-        this._leftCount = Math.max(0, this._leftCount - 1);
-        if (this._leftCount === 0) this.left = false;
-        break;
-      case 'right':
-        this._rightCount = Math.max(0, this._rightCount - 1);
-        if (this._rightCount === 0) this.right = false;
-        break;
-      case 'jump':
-        this._jumpCount = Math.max(0, this._jumpCount - 1);
-        if (this._jumpCount === 0) this.jumpHeld = false;
-        break;
-      case 'pause':
-        break;
-    }
+    this._keys.delete(key);
   }
 
   // AC-7.3 帧末重置边沿事件
