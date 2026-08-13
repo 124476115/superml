@@ -178,7 +178,8 @@ READY ──start──▶ PLAYING ──flag──▶ WON
 - [ ] AC-4.3 踩中未死亡敌人：敌人 `alive=false`，玩家 `vy=BOUNCE_VELOCITY`，得 100 分
 - [ ] AC-4.4 侧面接触存活敌人：玩家损失一条命并重生
 - [ ] AC-4.5 接触金币：金币 `taken=true`，得分 +100
-- [ ] AC-4.6 敌人巡逻：直行并在遇到实心瓦片或悬崖边缘时转向
+- [ ] AC-4.6 敌人巡逻：受重力下落（悬空敌人落到地面）后直行，并在遇到实心瓦片或悬崖边缘时转向
+- [ ] AC-4.7 被踩扁的敌人保留扁平形象 `SQUASH_DURATION` 秒（计时器递减），期间静止，结束后不再绘制
 
 ### AC-5 游戏流程（game）
 - [ ] AC-5.1 状态机：`READY→PLAYING`（start）、`PLAYING→WON`（触旗）、`PLAYING→GAME_OVER`（命=0）
@@ -187,20 +188,29 @@ READY ──start──▶ PLAYING ──flag──▶ WON
 - [ ] AC-5.4 命数减为 0 → 状态变为 `GAME_OVER`
 - [ ] AC-5.5 restart 恢复：命数=3、分=0、状态=READY、玩家回出生点、敌人/金币重置
 - [ ] AC-5.6 暂停：仅 PLAYING 可暂停/恢复，暂停期间 `update` 不推进
+- [ ] AC-5.7 顶出金币弹出动画：`coinPopOffset(popT)` 先上升（≤2 格）后回落，动画结束后静止在初始位置
+- [ ] AC-5.8 顶撞问号块生成的金币带弹出计时（`popT`），`update` 推进计时器并落回原位
 
 ### AC-6 渲染（render，逻辑部分可在 Node 测试）
 - [ ] AC-6.1 世界坐标→屏幕坐标换算：`screenX = worldX - cameraX`
 - [ ] AC-6.2 相机夹紧在关卡边界内（0 ≤ cameraX ≤ maxCameraX）
 - [ ] AC-6.3 相机平滑跟随玩家（目标 = 玩家X - 半屏宽，有最大追速）
+- [ ] AC-6.4 drawGame 可用 mock ctx 绘制不抛错
+- [ ] AC-6.5 调试命中框模式（debug=true）：描出玩家/敌人/金币/问号块/实心砖碰撞盒
+- [ ] AC-6.6 已顶问号块绘制为灰色「已用块」，顶出金币带弹出动画可正常绘制
 
 ### AC-7 输入（input）
 - [ ] AC-7.1 键位映射：`ArrowLeft`/`a`→左，`ArrowRight`/`d`→右，`ArrowUp`/`w`/` `→跳跃
 - [ ] AC-7.2 按键去重：同方向多个键同时按不产生冲突
 - [ ] AC-7.3 记录按下状态与按下/释放的边沿事件（用于可变跳跃与暂停）
 
-### AC-8 部署
+### AC-3.8 可及性（reachability，静态分析）
+- [ ] 依据玩家物理（跳高约 87px / 2 格、横跳约 4 格），关卡中每个问号块都可被顶（顶出金币也可拾取），每枚静态金币都可拾取
+
+### AC-8 部署与可玩性
 - [ ] AC-8.1 通过 lighttpd 软连接可访问游戏首页（HTTP 200）
 - [ ] AC-8.2 静态资源（JS/CSS/关卡）可正常加载（HTTP 200）
+- [ ] AC-8.5/8.6-8.8 全部 5 关均可被自动 AI（按住右 + 遇坑/墙/敌跳跃）通关
 
 ## 8. 测试 ↔ 验收标准 映射
 
@@ -213,6 +223,9 @@ READY ──start──▶ PLAYING ──flag──▶ WON
 | `test/game.test.js` | AC-5.x |
 | `test/render.test.js` | AC-6.x |
 | `test/input.test.js` | AC-7.x |
+| `test/reachability.test.js` | AC-3.8/8.9 |
+| `test/level1.test.js` | AC-8.1-8.5（level1 可玩性） |
+| `test/levels.test.js` | AC-8.6-8.8（全部 5 关可玩性） |
 | `deploy/verify.sh` | AC-8.x |
 
 ## 9. 非功能需求

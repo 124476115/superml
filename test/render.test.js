@@ -67,3 +67,69 @@ test('AC-6.4 drawGame 用 mock ctx 不抛错并执行绘制调用', () => {
   assert.ok(calls.includes('fillRect'), '应调用 fillRect 进行绘制');
   assert.ok(calls.length > 5, '应进行多次绘制调用');
 });
+
+test('AC-6.5 drawGame 调试命中框模式（debug=true）不抛错并描边', () => {
+  const level = parseLevel([
+    '....P......o..G..F',
+    '..................',
+    '..........#?......',
+    '..................',
+    '..................',
+    '.....###########.',
+    '##################',
+  ].join('\n'));
+  const game = new Game(level);
+  game.start();
+
+  const calls = [];
+  const ctx = new Proxy({}, {
+    get(_t, prop) {
+      if (prop === 'canvas') return { width: 800, height: 480 };
+      return (...args) => { calls.push(String(prop)); };
+    },
+    set() { return true; },
+  });
+
+  assert.doesNotThrow(() => drawGame(ctx, game, level, true));
+  assert.ok(calls.includes('strokeRect'), '调试模式应调用 strokeRect 描边');
+  assert.ok(calls.includes('setLineDash'), '应绘制虚线跳高提示');
+});
+
+test('AC-6.6 已顶问号块绘制为灰色已用块，顶出金币带弹出动画可正常绘制', () => {
+  const level = parseLevel([
+    '....P...............',
+    '..................',
+    '..........#?......',
+    '..................',
+    '..................',
+    '.....###########.',
+    '##################',
+  ].join('\n'));
+  const game = new Game(level);
+  game.start();
+  // 顶撞 (11,2) 问号块 → used=true，并生成一枚带弹出动画的金币
+  game.questionBump(11, 2);
+  const popped = game.coins[game.coins.length - 1];
+  assert.ok(popped.popT !== undefined, '顶出金币应带 popT');
+  popped.popT = 0.15; // 上升中途（显示在方块上方）
+
+  const calls = [];
+  const ctx = new Proxy({}, {
+    get(_t, prop) {
+      if (prop === 'canvas') return { width: 800, height: 480 };
+      return (...args) => { calls.push([String(prop), ...args]); };
+    },
+    set() { return true; },
+  });
+
+  assert.doesNotThrow(() => drawGame(ctx, game, level, true));
+  // 已用块：在 (11*32 - cam, 2*32) 位置有 fillRect 主体绘制
+  const cam = game.cameraX;
+  const usedX = 11 * TILE_SIZE - cam;
+  const usedY = 2 * TILE_SIZE;
+  const drawnUsed = calls.some((c) => c[0] === 'fillRect'
+    && Math.abs(c[1] - usedX) < 1 && Math.abs(c[2] - usedY) < 1 && c[3] === TILE_SIZE && c[4] === TILE_SIZE);
+  assert.ok(drawnUsed, '已顶问号块应在原位置绘制灰色已用块');
+  // 顶出金币：存在 arc 绘制（金币主体）
+  assert.ok(calls.some((c) => c[0] === 'arc'), '应绘制顶出金币的圆形');
+});

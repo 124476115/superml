@@ -5,7 +5,7 @@ import {
   TILE_SIZE, BOUNCE_VELOCITY, COIN_SCORE, ENEMY_SCORE,
 } from '../src/engine/physics.js';
 import { parseLevel } from '../src/engine/level.js';
-import { Game } from '../src/engine/game.js';
+import { Game, coinPopOffset, COIN_POP_RISE, COIN_POP_RISE_TIME, COIN_POP_FALL_TIME } from '../src/engine/game.js';
 import { createGoomba } from '../src/engine/entities.js';
 
 function noInput() {
@@ -205,4 +205,47 @@ test('相机在 PLAYING 时跟随玩家（cameraX 右移）', () => {
   game.player.x = 60 * TILE_SIZE;
   game.update(0.1, noInput());
   assert.ok(game.cameraX > 0, `cameraX 应跟随：${game.cameraX}`);
+});
+
+test('AC-5.7 coinPopOffset：顶出金币先上升后回落、动画结束后静止', () => {
+  const total = COIN_POP_RISE_TIME + COIN_POP_FALL_TIME;
+  // 起始静止
+  assert.equal(coinPopOffset(0), 0);
+  // 上升段：偏移为负（向上），高度 ≤ 2 格
+  const halfRise = coinPopOffset(COIN_POP_RISE_TIME / 2);
+  assert.ok(halfRise < 0, `上升中途应在方块上方：${halfRise}`);
+  assert.ok(halfRise >= -COIN_POP_RISE, '上升高度不超过 COIN_POP_RISE');
+  // 峰值 = 上升段结束
+  assert.equal(coinPopOffset(COIN_POP_RISE_TIME), -COIN_POP_RISE);
+  // 回落段：逐渐回到 0，且从不低于初始位置
+  const fallHalf = coinPopOffset(COIN_POP_RISE_TIME + COIN_POP_FALL_TIME / 2);
+  assert.ok(fallHalf < 0 && fallHalf > -COIN_POP_RISE, `回落中途仍在上升段之上：${fallHalf}`);
+  // 动画结束 → 静止在初始位置
+  assert.equal(coinPopOffset(total), 0);
+  assert.equal(coinPopOffset(total + 1), 0);
+});
+
+test('AC-5.8 顶撞问号块：新金币带弹出动画计时，update 推进并回落静止', () => {
+  const level = makeLevel();
+  level.questionTiles = [{ tx: 5, ty: 4, used: false }];
+  const game = new Game(level);
+  game.start();
+  game.questionBump(5, 4);
+  const coin = game.coins[game.coins.length - 1];
+  assert.equal(coin.taken, false);
+  assert.equal(coin.popT, 0, '新顶出金币应从 popT=0 开始');
+  const restY = coin.y;
+
+  // 前进一半上升时间 → 金币应位于初始位置之上
+  const dt = 0.01;
+  const stepsToMidRise = Math.round(COIN_POP_RISE_TIME / 2 / dt);
+  for (let i = 0; i < stepsToMidRise; i++) game.update(dt, noInput());
+  assert.ok(coin.y + coinPopOffset(coin.popT) < restY, '上升段应显示在方块上方');
+  assert.ok(coin.popT > 0, 'popT 应被推进');
+
+  // 一直更新到动画结束 → 金币落回初始位置
+  const stepsToEnd = Math.round((COIN_POP_RISE_TIME + COIN_POP_FALL_TIME) / dt) + 1;
+  for (let i = 0; i < stepsToEnd; i++) game.update(dt, noInput());
+  assert.equal(coin.y, restY);
+  assert.ok(coin.popT >= COIN_POP_RISE_TIME + COIN_POP_FALL_TIME, '动画计时器已走完');
 });

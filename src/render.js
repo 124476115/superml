@@ -3,6 +3,7 @@
 
 import { TILE_SIZE } from './engine/physics.js';
 import { VIEW_W, VIEW_H, screenX } from './engine/camera.js';
+import { coinPopOffset, COIN_POP_TOTAL } from './engine/game.js';
 
 // 颜色调色板（贴近 NES Mario）
 const C = {
@@ -41,8 +42,9 @@ const C = {
 
 /**
  * 绘制完整游戏画面
+ * @param {boolean} debug 是否绘制调试命中框（按 H 切换）
  */
-export function drawGame(ctx, game, level) {
+export function drawGame(ctx, game, level, debug = false) {
   const cam = game.cameraX;
 
   // 背景天空
@@ -64,25 +66,28 @@ export function drawGame(ctx, game, level) {
     }
   }
 
-  // 问号块
+  // 问号块（已用 → 灰色已用块，未用 → 金色问号块）
   for (const q of level.questionTiles || []) {
-    if (q.used) continue;
     const sx = screenX(q.tx * TILE_SIZE, cam);
     if (sx + TILE_SIZE < 0 || sx > VIEW_W) continue;
-    drawQuestionBlock(ctx, sx, q.ty * TILE_SIZE);
+    if (q.used) drawUsedBlock(ctx, sx, q.ty * TILE_SIZE);
+    else drawQuestionBlock(ctx, sx, q.ty * TILE_SIZE);
   }
 
-  // 金币
+  // 金币（顶出金币带弹出动画：上升后落回）
   for (const coin of game.coins) {
     if (coin.taken) continue;
     const sx = screenX(coin.x, cam);
     if (sx + coin.w < 0 || sx > VIEW_W) continue;
-    drawCoin(ctx, sx, coin.y, coin.w, coin.h);
+    const dy = (coin.popT !== undefined && coin.popT < COIN_POP_TOTAL)
+      ? coinPopOffset(coin.popT)
+      : 0;
+    drawCoin(ctx, sx, coin.y + dy, coin.w, coin.h);
   }
 
-  // 敌人
+  // 敌人（被踩扁后保留扁平形象，直至展示计时结束）
   for (const enemy of game.enemies) {
-    if (!enemy.alive && enemy.squashed) continue;
+    if (!enemy.alive && enemy.squashed && enemy.squashTimer <= 0) continue;
     const sx = screenX(enemy.x, cam);
     if (sx + enemy.w < 0 || sx > VIEW_W) continue;
     drawGoomba(ctx, sx, enemy.y, enemy.w, enemy.h, enemy.squashed);
@@ -110,6 +115,9 @@ export function drawGame(ctx, game, level) {
 
   // 状态覆盖层
   drawStateOverlay(ctx, game);
+
+  // 调试命中框（叠加在最上层）
+  if (debug) drawDebugHitboxes(ctx, game, level);
 }
 
 // ============= 背景层 =============
@@ -234,6 +242,24 @@ function drawQuestionBlock(ctx, x, y) {
   ctx.fillText('?', x + TILE_SIZE / 2, y + TILE_SIZE / 2 + 1);
   ctx.textAlign = 'start';
   ctx.textBaseline = 'alphabetic';
+}
+
+// 已顶过的问号块：灰色砖块（经典马里奥「已用」块）
+function drawUsedBlock(ctx, x, y) {
+  ctx.fillStyle = C.questionUsed;
+  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+  // 深色边框
+  ctx.fillStyle = '#6a4a20';
+  ctx.fillRect(x, y, TILE_SIZE, 3);
+  ctx.fillRect(x, y + TILE_SIZE - 3, TILE_SIZE, 3);
+  ctx.fillRect(x, y, 3, TILE_SIZE);
+  ctx.fillRect(x + TILE_SIZE - 3, y, 3, TILE_SIZE);
+  // 内部砖缝
+  ctx.fillStyle = '#7a5228';
+  ctx.fillRect(x, y + 15, TILE_SIZE, 2);
+  ctx.fillRect(x + 15, y, 2, 15);
+  ctx.fillRect(x + 7, y + 17, 2, 13);
+  ctx.fillRect(x + 23, y + 17, 2, 13);
 }
 
 // ============= 金币 =============
@@ -411,6 +437,62 @@ function drawFlag(ctx, x, yTop, height) {
   ctx.fillRect(x - 3, yTop + 12, 2, 24);
 }
 
+// ============= 调试命中框 =============
+function drawDebugHitboxes(ctx, game, level) {
+  const cam = game.cameraX;
+  const outline = (x, y, w, h, color) => {
+    const sx = screenX(x, cam);
+    if (sx + w < 0 || sx > VIEW_W) return;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(sx, y, w, h);
+  };
+
+  // 实心瓦片（砖块/地面）碰撞盒：半透明白描边
+  for (let ty = 0; ty < level.height; ty++) {
+    for (let tx = 0; tx < level.width; tx++) {
+      if (level.tiles[ty * level.width + tx] !== 1) continue;
+      outline(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE, 'rgba(255,255,255,0.35)');
+    }
+  }
+  // 问号块
+  for (const q of level.questionTiles || []) {
+    if (q.used) continue;
+    outline(q.tx * TILE_SIZE, q.ty * TILE_SIZE, TILE_SIZE, TILE_SIZE, 'rgba(255,170,0,0.95)');
+  }
+  // 金币（含顶出的金币，弹出动画跟随显示位置）
+  for (const coin of game.coins) {
+    if (coin.taken) continue;
+    const dy = (coin.popT !== undefined && coin.popT < COIN_POP_TOTAL)
+      ? coinPopOffset(coin.popT)
+      : 0;
+    outline(coin.x, coin.y + dy, coin.w || 20, coin.h || 24, 'rgba(255,221,0,0.95)');
+  }
+  // 敌人
+  for (const enemy of game.enemies) {
+    if (!enemy.alive) continue;
+    outline(enemy.x, enemy.y, enemy.w, enemy.h, 'rgba(255,60,60,0.95)');
+  }
+  // 玩家碰撞盒 + 最大跳高示意
+  if (game.player.alive) {
+    const p = game.player;
+    outline(p.x, p.y, p.w, p.h, '#00ff66');
+    // 站立点跳起后头顶最高位置（约 87px 跳高）的虚线框
+    ctx.strokeStyle = 'rgba(0,255,102,0.45)';
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(screenX(p.x, cam), p.y - 87, p.w, p.h);
+    ctx.setLineDash([]);
+  }
+  // 提示文字
+  ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = '#00ff66';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  ctx.fillText('HITBOXES [H]', VIEW_W - 10, 10);
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
 // ============= HUD =============
 function drawHUD(ctx, game) {
   ctx.font = 'bold 16px monospace';
@@ -437,8 +519,8 @@ function drawStateOverlay(ctx, game) {
 
   let text = '';
   if (game.state === 'READY') text = 'PRESS ENTER TO START';
-  else if (game.state === 'WON') text = 'YOU WIN! PRESS R TO RESTART';
-  else if (game.state === 'GAME_OVER') text = 'GAME OVER. PRESS R TO RESTART';
+  else if (game.state === 'WON') text = 'YOU WIN! PRESS ENTER';
+  else if (game.state === 'GAME_OVER') text = 'GAME OVER. PRESS ENTER';
   else if (game.paused) text = 'PAUSED';
 
   if (text) {

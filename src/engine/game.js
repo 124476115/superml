@@ -14,10 +14,35 @@ import { followCamera } from './camera.js';
 const COIN_W = 20;
 const COIN_H = 24;
 
+// 顶出金币弹出动画（经典马里奥）：上升 2 格后落回原位
+export const COIN_POP_RISE = 2 * TILE_SIZE; // 上升高度 64px
+export const COIN_POP_RISE_TIME = 0.3;      // 上升耗时（秒）
+export const COIN_POP_FALL_TIME = 0.25;     // 回落耗时（秒）
+export const COIN_POP_TOTAL = COIN_POP_RISE_TIME + COIN_POP_FALL_TIME;
+
+/**
+ * 顶出金币在 popT 时刻相对静止位置的偏移（px，负 = 向上）。
+ * popT ∈ [0, RISE_TIME) 上升；[RISE_TIME, TOTAL) 回落；≥ TOTAL 静止。
+ * @param {number} popT 弹出动画已耗时（秒）
+ * @returns {number} 偏移量（负值表示在初始位置上方）
+ */
+export function coinPopOffset(popT) {
+  if (popT <= 0) return 0;
+  if (popT < COIN_POP_RISE_TIME) {
+    return -COIN_POP_RISE * (popT / COIN_POP_RISE_TIME);
+  }
+  if (popT < COIN_POP_TOTAL) {
+    const t = (popT - COIN_POP_RISE_TIME) / COIN_POP_FALL_TIME;
+    return -COIN_POP_RISE * (1 - t);
+  }
+  return 0;
+}
+
 export class Game {
   constructor(level) {
     this.level = level;
     this.player = createPlayer(level.playerStart.x, level.playerStart.y);
+    this.respawnPoint = { x: level.playerStart.x, y: level.playerStart.y };
     this.enemies = (level.enemies || []).map((e) => createGoomba(e.x, e.y));
     this.coins = (level.coins || []).map((c) => ({
       x: c.x,
@@ -88,8 +113,8 @@ export class Game {
   }
 
   respawnPlayer() {
-    this.player.x = this.level.playerStart.x;
-    this.player.y = this.level.playerStart.y;
+    this.player.x = this.respawnPoint.x;
+    this.player.y = this.respawnPoint.y;
     this.player.vx = 0;
     this.player.vy = 0;
     this.player.onGround = false;
@@ -97,7 +122,7 @@ export class Game {
     this.invincibleTimer = 1.5;
   }
 
-  // AC-2.6 顶撞问号块：标记已用并在上方生成金币
+  // AC-2.6 顶撞问号块：标记已用并在上方生成金币（带弹出动画计时）
   questionBump(tx, ty) {
     const q = this.questionTiles.find((qt) => qt.tx === tx && qt.ty === ty);
     if (!q || q.used) return;
@@ -108,6 +133,7 @@ export class Game {
       w: COIN_W,
       h: COIN_H,
       taken: false,
+      popT: 0,
     });
   }
 
@@ -137,6 +163,13 @@ export class Game {
     // 4. 顶撞问号块
     for (const b of info.bumpedTiles) {
       this.questionBump(b.tx, b.ty);
+    }
+
+    // 4.5 顶出金币弹出动画计时
+    for (const coin of this.coins) {
+      if (coin.popT !== undefined && coin.popT < COIN_POP_TOTAL) {
+        coin.popT += dt;
+      }
     }
 
     // 5. 坠崖判定

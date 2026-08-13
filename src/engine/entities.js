@@ -6,7 +6,7 @@ import {
   TILE_SIZE, ACCEL, DECEL,
   applyGravity, capFall, accelerate, decelerate, jump, cutJump,
 } from './physics.js';
-import { aabbOverlap, solidTilesOverlap, tileAt } from './collision.js';
+import { aabbOverlap, solidTilesOverlap, tileAt, moveWithCollision } from './collision.js';
 
 // AC-4 玩家工厂
 export function createPlayer(x, y) {
@@ -24,6 +24,8 @@ export function createPlayer(x, y) {
 }
 
 // AC-4 敌人工厂
+export const SQUASH_DURATION = 0.5; // 被踩扁后的扁平展示时长（秒）
+
 export function createGoomba(x, y) {
   return {
     type: 'goomba',
@@ -33,8 +35,10 @@ export function createGoomba(x, y) {
     vx: ENEMY_SPEED,
     vy: 0,
     dir: 1,
+    onGround: false,
     alive: true,
     squashed: false,
+    squashTimer: 0, // 被踩扁后保留扁平形象的时间
   };
 }
 
@@ -72,7 +76,7 @@ export function updatePlayer(p, input, dt) {
 
 // AC-4.3 玩家与敌人碰撞分类
 export function enemyCollisionType(p, e) {
-  if (!e.alive) return null;
+  if (!e.alive || e.squashed) return null;
   if (!aabbOverlap(p, e)) return null;
   // 玩家下落且脚部在敌人上半部 → 踩中
   const playerBottom = p.y + p.h;
@@ -85,6 +89,7 @@ export function enemyCollisionType(p, e) {
 export function squashEnemy(e) {
   e.alive = false;
   e.squashed = true;
+  e.squashTimer = SQUASH_DURATION; // 保留扁平形象，供渲染展示
 }
 
 // AC-4.3d 玩家反弹
@@ -105,29 +110,39 @@ export function takeCoin(coin) {
   coin.taken = true;
 }
 
-// AC-4.6 敌人巡逻：遇墙或悬崖转向
+// AC-4.6 敌人巡逻：受重力下落、落地后直行、遇墙或悬崖转向
+// 悬空敌人（如关卡 2-5 的出生点）会先落到地面再开始巡逻
 export function updateGoomba(g, level, dt) {
-  if (g.squashed || !g.alive) return;
+  if (g.squashed || !g.alive) {
+    // 被踩扁：递减展示计时器，期间保持静止
+    if (g.squashed && g.squashTimer > 0) g.squashTimer = Math.max(0, g.squashTimer - dt);
+    return;
+  }
+
+  // 重力下落
+  g.vy = capFall(applyGravity(g.vy, dt));
 
   const oldX = g.x;
-  g.x += g.vx * dt;
+  const info = moveWithCollision(g, dt, level);
+  g.onGround = info.onGround;
 
-  // 撞墙检测
-  if (solidTilesOverlap(g, level)) {
-    g.x = oldX;
+  // 撞墙转向（moveWithCollision 已把敌人贴墙并把 vx 归零）
+  if (info.hitX) {
     g.dir = -g.dir;
     g.vx = ENEMY_SPEED * g.dir;
     return;
   }
 
-  // 悬崖检测：前方下方是否有地面
-  const frontX = g.dir > 0 ? g.x + g.w : g.x;
-  const frontTx = Math.floor(frontX / TILE_SIZE);
-  const groundTy = Math.floor((g.y + g.h) / TILE_SIZE);
-  const groundTile = tileAt(level, frontTx, groundTy);
-  if (!groundTile || !groundTile.solid) {
-    g.x = oldX;
-    g.dir = -g.dir;
-    g.vx = ENEMY_SPEED * g.dir;
+  // 悬崖检测：仅在地面上时进行，避免下落途中误判转向
+  if (g.onGround) {
+    const frontX = g.dir > 0 ? g.x + g.w : g.x;
+    const frontTx = Math.floor(frontX / TILE_SIZE);
+    const groundTy = Math.floor((g.y + g.h) / TILE_SIZE);
+    const groundTile = tileAt(level, frontTx, groundTy);
+    if (!groundTile || !groundTile.solid) {
+      g.x = oldX;
+      g.dir = -g.dir;
+      g.vx = ENEMY_SPEED * g.dir;
+    }
   }
 }

@@ -148,6 +148,28 @@ test('AC-4.6c 敌人遇悬崖边缘转向', () => {
   assert.equal(g.vx, -ENEMY_SPEED);
 });
 
+test('AC-4.6e 悬空敌人受重力落到地面并继续巡逻', () => {
+  const level = { width: 20, height: 10, tiles: new Array(200).fill(0) };
+  for (let x = 0; x < 20; x++) level.tiles[8 * 20 + x] = 1; // 地面在行 8
+  const groundY = 8 * TILE_SIZE - ENEMY_HEIGHT;
+  // 敌人出生在行 4（悬空 4 行），应落到地面
+  const g = createGoomba(5 * TILE_SIZE, 4 * TILE_SIZE);
+
+  // 持续更新直至落地（最多 600 帧）
+  let frames = 0;
+  while (g.y < groundY - 1 && frames < 600) {
+    updateGoomba(g, level, 1 / 60);
+    frames++;
+  }
+  assert.equal(g.y, groundY, `敌人应落到地面 (y=${groundY})，实际 ${g.y}`);
+  assert.equal(g.onGround, true, '落地后 onGround 应为 true');
+
+  // 落地后继续向右巡逻（水平移动）
+  const x0 = g.x;
+  for (let i = 0; i < 10; i++) updateGoomba(g, level, 1 / 60);
+  assert.ok(g.x > x0, '落地后应继续水平巡逻');
+});
+
 test('AC-4.6d 被踩扁的敌人不再移动', () => {
   const level = { width: 20, height: 10, tiles: new Array(200).fill(0) };
   for (let x = 0; x < 20; x++) level.tiles[8 * 20 + x] = 1;
@@ -156,6 +178,21 @@ test('AC-4.6d 被踩扁的敌人不再移动', () => {
   const before = g.x;
   updateGoomba(g, level, 0.1);
   assert.equal(g.x, before);
+});
+
+test('AC-4.3e 被踩扁的敌人保留扁平形象一段时间后计时归零（便于渲染展示）', () => {
+  const level = { width: 20, height: 10, tiles: new Array(200).fill(0) };
+  for (let x = 0; x < 20; x++) level.tiles[8 * 20 + x] = 1;
+  const g = createGoomba(5 * TILE_SIZE, 8 * TILE_SIZE - ENEMY_HEIGHT);
+  squashEnemy(g);
+  assert.ok(g.squashTimer > 0, '被踩扁后应有展示计时器');
+  const t0 = g.squashTimer;
+  updateGoomba(g, level, 0.1);
+  assert.ok(g.squashTimer < t0, '计时器应随时间递减');
+  // 计时期间始终保持静止
+  assert.equal(g.x, 5 * TILE_SIZE);
+  for (let i = 0; i < 10; i++) updateGoomba(g, level, 0.1);
+  assert.ok(g.squashTimer <= 0, '计时结束后应归零');
 });
 
 test('createPlayer / createGoomba 初始状态符合 SPEC', () => {

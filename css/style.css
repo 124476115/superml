@@ -1,0 +1,48 @@
+/* 超级玛丽 — 页面样式：深色背景、画布居中、边框与阴影 */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #1a1a2e; /* 深色背景 */
+  font-family: monospace;
+  color: #eee;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 6px;
+  color: #ffd700;
+  text-shadow: 2px 2px 0 #a00000;
+}
+
+#game {
+  display: block;
+  width: 800px;
+  height: 480px;
+  background: #5c94fc;
+  border: 3px solid #333;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  image-rendering: pixelated;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: #99a2b5;
+}

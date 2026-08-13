@@ -29,26 +29,24 @@ function autoRunToFlag(maxFrames = 8000) {
       const tileAhead = level.tiles[(ty - 1) * level.width + tx];
       const needJumpForGap = tileBelow !== 1;
       const needJumpForWall = tileAhead === 1;
-      // 前方 3 瓦片内是否有敌人
+      // 3 瓦片内是否有敌人（含迎面折返的敌人，|dx| 检测）
       let needJumpForEnemy = false;
       for (const e of game.enemies) {
         if (!e.alive) continue;
         const dx = e.x - game.player.x;
-        if (dx > 0 && dx < TILE_SIZE * 3 &&
+        if (Math.abs(dx) < TILE_SIZE * 3 &&
             Math.abs(e.y - game.player.y) < TILE_SIZE) {
           needJumpForEnemy = true;
           break;
         }
       }
-      if (needJumpForGap || needJumpForWall || needJumpForEnemy) {
-        input.keydown(' ');
-      } else {
-        input.keyup(' ');
-      }
+      // 落地时先松开再按下，制造边沿以再次起跳（按住维持跳高）
+      const needJump = needJumpForGap || needJumpForWall || needJumpForEnemy;
+      input.keyup(' ');
+      if (needJump) input.keydown(' ');
     }
     game.update(DT, input);
     input.resetFrame();
-    if (input.jumpHeld === false) input.keyup(' ');
 
     if (game.state === 'WON') return i;
     if (game.state === 'GAME_OVER') return -1;
